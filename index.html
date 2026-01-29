@@ -1,137 +1,304 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="sr">
 <head>
     <meta charset="UTF-8">
+    <title>Pregled proizvodnje</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GitHub-like Project Management</title>
     <script type="module">
+        // Import the functions you need from the SDKs you need
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
-        import { getFirestore, collection, addDoc, getDocs } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js";
-        import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js";
 
+        // Your web app's Firebase configuration
         const firebaseConfig = {
-            apiKey: "YOUR_API_KEY",
-            authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-            projectId: "YOUR_PROJECT_ID",
-            storageBucket: "YOUR_PROJECT_ID.appspot.com",
-            messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-            appId: "YOUR_APP_ID"
+            apiKey: "AIzaSyATddV2eWAhAN2gi6Y8uQTwqLf3pv4fyK8",
+            authDomain: "pregled-proizvodnje.firebaseapp.com",
+            projectId: "pregled-proizvodnje",
+            storageBucket: "pregled-proizvodnje.firebasestorage.app",
+            messagingSenderId: "908385637795",
+            appId: "1:908385637795:web:6ef03d4095bcc9beab3616"
         };
 
+        // Initialize Firebase
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
-        const auth = getAuth(app);
 
-        async function signIn(email, password) {
-            try {
-                await signInWithEmailAndPassword(auth, email, password);
-                console.log("User signed in");
-                fetchUserProjects(auth.currentUser.uid);
-            } catch (error) {
-                console.error("Error signing in: ", error);
-            }
+        async function initMeseci() {
+            let m = document.getElementById("mesec");
+            m.innerHTML = "";
+            ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"].forEach((x, i) => {
+                let o = document.createElement("option");
+                o.value = x;
+                o.text = i + 1;
+                m.appendChild(o);
+            });
+            m.value = (new Date().getMonth() + 1).toString().padStart(2, "0");
         }
 
-        async function register(email, password) {
-            try {
-                await createUserWithEmailAndPassword(auth, email, password);
-                console.log("User registered");
-            } catch (error) {
-                console.error("Error registering: ", error);
-            }
+        async function initGodine() {
+            let g = document.getElementById("godina");
+            g.innerHTML = "";
+
+            let godine = new Set();
+            godine.add("2025");
+
+            const querySnapshot = await getDocs(collection(db, "proizvodnja"));
+            querySnapshot.forEach((doc) => {
+                const r = doc.data();
+                if (r.datum) {
+                    godine.add(r.datum.split("-")[0]);
+                }
+            });
+
+            [...godine].sort().forEach(y => {
+                let o = document.createElement("option");
+                o.value = y;
+                o.text = y;
+                g.appendChild(o);
+            });
+
+            g.value = new Date().getFullYear().toString();
         }
 
-        async function saveData(userId, projectData) {
+        async function dodaj() {
+            let r = {
+                datum: datum.value,
+                vazna: vazna.value,
+                cena: +cenaVazne.value || 0,
+                gram: +gramaza.value || 0,
+                uk: +ukTezina.value || 0,
+                ost: +ostalo.value || 0,
+                kom: komentar.value
+            };
+
             try {
-                const docRef = await addDoc(collection(db, "projects"), {
-                    userId: userId,
-                    ...projectData
-                });
-                console.log("Document written with ID: ", docRef.id);
-                fetchUserProjects(userId); // Refresh projects
+                await addDoc(collection(db, "proizvodnja"), r);
+                initGodine();
+                render();
+
+                datum.value = "";
+                vazna.value = "";
+                cenaVazne.value = "";
+                gramaza.value = "";
+                ukTezina.value = "";
+                ostalo.value = "";
+                komentar.value = "";
             } catch (e) {
                 console.error("Error adding document: ", e);
             }
         }
 
-        async function fetchUserProjects(userId) {
-            const querySnapshot = await getDocs(collection(db, "projects"));
-            const projectsList = document.getElementById("projectsList");
-            projectsList.innerHTML = ""; // Clear existing projects
+        async function obrisi(id) {
+            await deleteDoc(doc(db, "proizvodnja", id));
+            initGodine();
+            render();
+        }
 
+        async function render() {
+            let tb = document.getElementById("tabela");
+            tb.innerHTML = "";
+
+            let m = document.getElementById("mesec").value;
+            let g = document.getElementById("godina").value;
+            let fk = document.getElementById("filterKomentar").value.toLowerCase();
+            let marza = (+document.getElementById("marza").value || 0) / 100;
+
+            let mz = 0, ms = 0;
+
+            const querySnapshot = await getDocs(collection(db, "proizvodnja"));
             querySnapshot.forEach((doc) => {
-                const data = doc.data();
-                if (data.userId === userId) {
-                    const li = document.createElement("li");
-                    li.textContent = `${data.projectName} - ${data.projectDescription}`;
-                    projectsList.appendChild(li);
-                }
+                const r = doc.data();
+                const id = doc.id; // Get document ID
+
+                if (!r.datum) return;
+
+                let [yy, mm] = r.datum.split("-");
+                if (mm !== m || yy !== g) return;
+
+                if (fk && !r.kom.toLowerCase().includes(fk)) return;
+
+                let sap = r.uk - r.gram;
+                let ukup = r.cena + sap + r.ost;
+                let prod = ukup * (1 + marza);
+                let zar = prod - ukup;
+
+                mz += zar;
+                ms += sap;
+
+                let tr = document.createElement("tr");
+                tr.innerHTML = `
+                    <td>${r.datum}</td>
+                    <td>${r.vazna}</td>
+                    <td>${r.cena}</td>
+                    <td>${r.gram}</td>
+                    <td>${r.uk}</td>
+                    <td>${sap.toFixed(2)}</td>
+                    <td>${r.ost}</td>
+                    <td>${ukup.toFixed(2)}</td>
+                    <td>${prod.toFixed(2)}</td>
+                    <td>${zar.toFixed(2)}</td>
+                    <td>${r.kom}</td>
+                    <td><button onclick="obrisi('${id}')">X</button></td>
+                `;
+                tb.appendChild(tr);
             });
+
+            mesecZarada.textContent = mz.toFixed(2);
+            mesecSapun.textContent = ms.toFixed(2);
         }
 
-        onAuthStateChanged(auth, (user) => {
-            if (user) {
-                console.log("User is signed in:", user);
-                fetchUserProjects(user.uid); // Fetch projects when user signs in
-            } else {
-                console.log("No user is signed in");
-            }
-        });
-
-        function handleSignIn() {
-            const email = document.getElementById("email").value;
-            const password = document.getElementById("password").value;
-            signIn(email, password);
-        }
-
-        function handleRegister() {
-            const email = document.getElementById("email").value;
-            const password = document.getElementById("password").value;
-            register(email, password);
-        }
-
-        function handleAddProject() {
-            const projectName = document.getElementById("projectName").value;
-            const projectDescription = document.getElementById("projectDescription").value;
-
-            if (auth.currentUser) {
-                saveData(auth.currentUser.uid, { projectName, projectDescription });
-                document.getElementById("projectName").value = "";
-                document.getElementById("projectDescription").value = "";
-            } else {
-                alert("Please sign in to add a project.");
-            }
-        }
-
-        async function handleSignOut() {
-            await signOut(auth);
-            console.log("User signed out");
+        window.onload = async function() {
+            initMeseci();
+            await initGodine();
+            await render();
         }
     </script>
+    <style>
+        :root {
+            --bg: #f6f8fb;
+            --card: #ffffff;
+            --primary: #6c63ff;
+            --secondary: #00b894;
+            --danger: #ff7675;
+            --text: #2d3436;
+            --muted: #636e72;
+        }
+
+        body {
+            font-family: "Segoe UI", sans-serif;
+            margin: 10px;
+            background: var(--bg);
+            color: var(--text);
+        }
+
+        input, select, button {
+            margin: 4px;
+            padding: 8px 10px;
+            border-radius: 6px;
+            border: 1px solid #dcdde1;
+            font-size: 14px;
+        }
+
+        input:focus, select:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        button {
+            background: var(--primary);
+            color: #fff;
+            border: none;
+            cursor: pointer;
+            transition: .2s;
+        }
+
+        button:hover {
+            opacity: .9;
+        }
+
+        .filter {
+            background: var(--card);
+            padding: 10px;
+            border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, .05);
+            margin-bottom: 10px;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .summary {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            color: #fff;
+            padding: 12px;
+            border-radius: 10px;
+            margin: 10px 0;
+            font-weight: bold;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+            background: var(--card);
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, .05);
+        }
+
+        th {
+            background: var(--primary);
+            color: #fff;
+            padding: 10px;
+        }
+
+        td {
+            padding: 8px;
+            border-bottom: 1px solid #eee;
+        }
+
+        tr:hover {
+            background: #f1f3ff;
+        }
+
+        td:nth-child(10) {
+            font-weight: bold;
+            color: var(--secondary);
+        }
+
+        button.danger {
+            background: var(--danger);
+            padding: 6px 10px;
+        }
+    </style>
 </head>
 <body>
-    <h1>GitHub-like Project Management</h1>
 
-    <div>
-        <h2>Sign In / Register</h2>
-        <input type="email" id="email" placeholder="Email" required>
-        <input type="password" id="password" placeholder="Password" required>
-        <button onclick="handleSignIn()">Sign In</button>
-        <button onclick="handleRegister()">Register</button>
-    </div>
+<div class="filter">
+    <select id="mesec"></select>
+    <select id="godina"></select>
+    <input placeholder="Filter komentar" id="filterKomentar">
+    <button onclick="render()">Filtriraj</button>
+    <input type="number" id="marza" step="0.1" value="90"> % marže
+</div>
 
-    <div>
-        <h2>Add a Project</h2>
-        <input type="text" id="projectName" placeholder="Project Name" required>
-        <input type="text" id="projectDescription" placeholder="Project Description" required>
-        <button onclick="handleAddProject()">Add Project</button>
-    </div>
+<div class="summary">
+    Zarada perioda: <span id="mesecZarada">0</span> |
+    Sapun potrošen: <span id="mesecSapun">0</span>
+</div>
 
-    <div>
-        <h2>Your Projects</h2>
-        <ul id="projectsList"></ul>
-    </div>
+<div>
+    <input type="date" id="datum">
+    <input placeholder="Vazna (opis / odakle)" id="vazna">
+    <input type="number" placeholder="Cena vazne" id="cenaVazne">
+    <input type="number" placeholder="Gramaža vazne" id="gramaza">
+    <input type="number" placeholder="Ukupna težina" id="ukTezina">
+    <input type="number" placeholder="Ostalo" id="ostalo">
+    <input placeholder="Komentar" id="komentar">
+    <button onclick="dodaj()">Dodaj</button>
+</div>
 
-    <button onclick="handleSignOut()">Sign Out</button>
+<table>
+    <thead>
+    <tr>
+        <th>Datum</th>
+        <th>Vazna</th>
+        <th>Cena</th>
+        <th>Gramaža</th>
+        <th>Uk.tež</th>
+        <th>Sapun</th>
+        <th>Ostalo</th>
+        <th>Ukupno</th>
+        <th>Prodajna</th>
+        <th>Zarada</th>
+        <th>Komentar</th>
+        <th></th>
+    </tr>
+    </thead>
+    <tbody id="tabela"></tbody>
+</table>
+
 </body>
 </html>
