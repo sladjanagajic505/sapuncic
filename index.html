@@ -55,6 +55,12 @@ td{
   padding:8px;
   border-bottom:1px solid #eee;
 }
+
+td button{
+  margin:0 2px;
+  padding:4px 6px;
+  font-size:14px;
+}
 </style>
 </head>
 
@@ -99,7 +105,7 @@ td{
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import {
-  getFirestore, collection, addDoc, getDocs, deleteDoc, doc
+  getFirestore, collection, addDoc, getDocs, deleteDoc, doc, updateDoc
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -128,13 +134,15 @@ window.dodaj = async function(){
   if(!datum.value) return;
 
   await addDoc(collection(db,"proizvodnja"),{
-    datum:datum.value,
-    vazna:vazna.value,
-    cena:+cenaVazne.value||0,
-    gram:+gramaza.value||0,
-    uk:+ukTezina.value||0,
-    ost:+ostalo.value||0,
-    kom:komentar.value
+    datum: datum.value,
+    vazna: vazna.value,
+    cena: +cenaVazne.value||0,
+    gram: +gramaza.value||0,
+    uk: +ukTezina.value||0,
+    ost: +ostalo.value||0,
+    kom: komentar.value,
+    prodajna: null,
+    rucna: false
   });
 
   ocistiFormu();
@@ -167,6 +175,7 @@ inputs.forEach((inp,i)=>{
   });
 });
 
+/* INIT meseci i godine */
 function initMeseci(){
   mesec.innerHTML="";
   mesec.innerHTML+=`<option value="">Svi meseci</option>`;
@@ -181,37 +190,53 @@ function initGodine(){
   [...set].sort().forEach(y=>godina.innerHTML+=`<option>${y}</option>`);
 }
 
+/* EDIT funkcija */
+window.editRow = function(id){
+  let r = podaci.find(x=>x.id===id);
+  let novaCena = prompt("Unesi prodajnu cenu:", r.prodajna ?? "");
+  if(novaCena===null) return;
+  novaCena = +novaCena;
+  if(isNaN(novaCena)) return alert("Mora broj");
+  updateDoc(doc(db,"proizvodnja",id),{
+    prodajna: novaCena,
+    rucna: true
+  }).then(ucitajPodatke);
+}
+
+/* render tabela */
 window.render=function(){
   tabela.innerHTML="";
-
-  let m = mesec.value;
-  let g = godina.value;
-  let marza = (+document.getElementById("marza").value || 0) / 100;
+  let m=mesec.value, g=godina.value;
+  let marza = (+document.getElementById("marza").value||0)/100;
   let fk = document.getElementById("filterKomentar").value.toLowerCase();
 
   let mz=0, ms=0;
 
   podaci.forEach(r=>{
     if(!r.datum) return;
-
     let [yy,mm]=r.datum.split("-");
-
     if(m && mm!==m) return;
     if(g && yy!==g) return;
-	if (fk && !(r.kom || "").toLowerCase().includes(fk)) return;
-
+    if(fk && !(r.kom||"").toLowerCase().includes(fk)) return;
 
     let sap = r.uk - r.gram;
     let ukup = r.cena + sap + r.ost;
-    let prod = ukup * (1 + marza);
-    let zar = prod - ukup;
+    let prod, zar;
+
+    if(r.rucna && r.prodajna){
+      prod = r.prodajna;
+      zar = prod - ukup;
+    }else{
+      prod = ukup*(1+marza);
+      zar = prod - ukup;
+    }
 
     mz += zar;
     ms += sap;
 
     tabela.innerHTML += `
       <tr>
-        <td>${r.datum}</td>
+        <td>${formatDatum(r.datum)}</td>
         <td>${r.vazna}</td>
         <td>${r.cena}</td>
         <td>${r.gram}</td>
@@ -221,13 +246,16 @@ window.render=function(){
         <td>${ukup.toFixed(2)}</td>
         <td>${prod.toFixed(2)}</td>
         <td>${zar.toFixed(2)}</td>
-        <td>${r.kom || ""}</td>
-        <td><button class="danger" onclick="obrisi('${r.id}')">X</button></td>
+        <td>${r.kom||""}</td>
+        <td>
+          <button onclick="editRow('${r.id}')">✏️</button>
+          <button class="danger" onclick="obrisi('${r.id}')">❌</button>
+        </td>
       </tr>`;
   });
 
-  mesecZarada.textContent = mz.toFixed(2);
-  mesecSapun.textContent = ms.toFixed(2);
+  mesecZarada.textContent=mz.toFixed(2);
+  mesecSapun.textContent=ms.toFixed(2);
 }
 
 initMeseci();
