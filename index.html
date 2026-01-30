@@ -4,10 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<title>SapuncicS</title>
+<title>Pregled proizvodnje</title>
 
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#6c63ff">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <style>
 :root{
@@ -42,16 +43,29 @@ button{
 
 button.danger{background:var(--danger);}
 
+.filter, #forma{
+  display:flex;
+  flex-wrap:wrap;
+  gap:6px;
+}
+
+.summary{
+  margin:10px 0;
+  font-weight:600;
+}
+
 .table-wrap{
+  width:100%;
   overflow-x:auto;
+  -webkit-overflow-scrolling:touch;
 }
 
 table{
   width:100%;
+  min-width:1200px;
   border-collapse:collapse;
   margin-top:10px;
   background:var(--card);
-  min-width:900px;
 }
 
 th{
@@ -66,6 +80,17 @@ td{
   border-bottom:1px solid #eee;
   white-space:nowrap;
 }
+
+td button{
+  margin:0 2px;
+  padding:4px 6px;
+}
+
+@media (max-width:768px){
+  .filter, #forma{flex-direction:column;}
+  input,select,button{width:100%;font-size:16px;}
+  td button{min-width:38px;min-height:38px;}
+}
 </style>
 </head>
 
@@ -74,9 +99,9 @@ td{
 <div class="filter">
   <select id="mesec"></select>
   <select id="godina"></select>
-  <input placeholder="Filter komentar" id="filterKomentar">
+  <input id="filterKomentar" placeholder="Filter komentar">
   <button onclick="render()">Filtriraj</button>
-  <input type="number" id="marza" step="0.1" value="90"> % marže
+  <input type="number" id="marza" value="90" step="0.1"> % marže
 </div>
 
 <div class="summary">
@@ -86,13 +111,13 @@ td{
 
 <div id="forma">
   <input type="date" id="datum">
-  <input placeholder="Vazna (patuljak)" id="vazna">
-  <input type="number" placeholder="Cena vazne" id="cenaVazne">
-  <input type="number" placeholder="Gramaža vazne" id="gramaza">
-  <input type="number" placeholder="Ukupna težina" id="ukTezina">
-  <input type="number" placeholder="Ostalo" id="ostalo">
-  <input placeholder="Komentar" id="komentar">
-  <button onclick="dodaj()">Dodaj</button>
+  <input id="vazna" placeholder="Vazna">
+  <input type="number" id="cenaVazne" placeholder="Cena vazne">
+  <input type="number" id="gramaza" placeholder="Gramaža vazne">
+  <input type="number" id="ukTezina" placeholder="Ukupna težina">
+  <input type="number" id="ostalo" placeholder="Ostalo">
+  <input id="komentar" placeholder="Komentar">
+  <button id="btnDodaj" onclick="dodaj()">Dodaj</button>
 </div>
 
 <div class="table-wrap">
@@ -111,9 +136,8 @@ td{
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import {
-  getFirestore, collection, addDoc, getDocs, deleteDoc, doc, updateDoc
-} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc, updateDoc }
+from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyATddV2eWAhAN2gi6Y8uQTwqLf3pv4fyK8",
@@ -138,18 +162,18 @@ async function ucitajPodatke(){
 }
 
 window.dodaj = async function(){
-  if(!datum.value || !vazna.value) return alert("Unesi datum i vaznu");
+  if(!datum.value) return;
 
   await addDoc(collection(db,"proizvodnja"),{
-    datum: datum.value,
-    vazna: vazna.value,
-    cena: +cenaVazne.value||0,
-    gram: +gramaza.value||0,
-    uk: +ukTezina.value||0,
-    ost: +ostalo.value||0,
-    kom: komentar.value,
-    prodajna: null,
-    rucna: false
+    datum:datum.value,
+    vazna:vazna.value,
+    cena:+cenaVazne.value||0,
+    gram:+gramaza.value||0,
+    uk:+ukTezina.value||0,
+    ost:+ostalo.value||0,
+    kom:komentar.value,
+    prodajna:null,
+    rucna:false
   });
 
   forma.querySelectorAll("input").forEach(i=>i.value="");
@@ -157,31 +181,33 @@ window.dodaj = async function(){
   ucitajPodatke();
 }
 
-window.obrisi = async function(id){
+window.obrisi = async id=>{
   await deleteDoc(doc(db,"proizvodnja",id));
   ucitajPodatke();
-}
+};
 
-/* ENTER navigacija */
+/* ENTER NAVIGACIJA – FINAL FIX */
 const inputs=[datum,vazna,cenaVazne,gramaza,ukTezina,ostalo,komentar];
 inputs.forEach((inp,i)=>{
   inp.addEventListener("keydown",e=>{
     if(e.key==="Enter"){
       e.preventDefault();
-      if(i < inputs.length-1){
-        inputs[i+1].focus();
-      }else{
-        dodaj();
-      }
+      if(i<inputs.length-1) inputs[i+1].focus();
+      else document.getElementById("btnDodaj").click();
     }
   });
 });
 
-/* INIT */
+function formatDatum(d){
+  if(!d) return "";
+  let [y,m,da]=d.split("-");
+  return `${da}/${m}/${y}`;
+}
+
 function initMeseci(){
   mesec.innerHTML=`<option value="">Svi meseci</option>`;
   ["01","02","03","04","05","06","07","08","09","10","11","12"]
-    .forEach((x,i)=>mesec.innerHTML+=`<option value="${x}">${i+1}</option>`);
+  .forEach((x,i)=>mesec.innerHTML+=`<option value="${x}">${i+1}</option>`);
 }
 
 function initGodine(){
@@ -191,34 +217,34 @@ function initGodine(){
   [...set].sort().forEach(y=>godina.innerHTML+=`<option>${y}</option>`);
 }
 
-function formatDatum(d){
-  if(!d) return "";
-  let [y,m,dd]=d.split("-");
-  return `${dd}/${m}/${y}`;
-}
+window.editRow=id=>{
+  let r=podaci.find(x=>x.id===id);
+  let c=prompt("Unesi prodajnu cenu:",r.prodajna??"");
+  if(c===null||isNaN(+c)) return;
+  updateDoc(doc(db,"proizvodnja",id),{prodajna:+c,rucna:true})
+  .then(ucitajPodatke);
+};
 
-/* RENDER */
 window.render=function(){
   tabela.innerHTML="";
+  let m=mesec.value,g=godina.value;
   let marza=(+marzaInput.value||0)/100;
-  let mz=0, ms=0;
+  let fk=filterKomentar.value.toLowerCase();
+  let mz=0,ms=0;
 
   podaci.forEach(r=>{
-    let sap = r.uk - r.gram;
-    let ukup, prod, zar;
+    if(!r.datum) return;
+    let [yy,mm]=r.datum.split("-");
+    if(m&&mm!==m) return;
+    if(g&&yy!==g) return;
+    if(fk&&!((r.kom||"").toLowerCase().includes(fk))) return;
 
-    if((r.vazna||"").toLowerCase()==="patuljak"){
-      ukup = r.uk + r.ost;
-      prod = ukup * (1 + marza);
-      zar = prod - ukup;
-    }else{
-      ukup = r.cena + sap + r.ost;
-      prod = r.prodajna ?? ukup * (1 + marza);
-      zar = prod - ukup;
-    }
+    let sap=r.uk-r.gram;
+    let ukup=r.cena+sap+r.ost;
+    let prod=(r.rucna&&r.prodajna)?r.prodajna:ukup*(1+marza);
+    let zar=prod-ukup;
 
-    mz+=zar;
-    ms+=sap;
+    mz+=zar; ms+=sap;
 
     tabela.innerHTML+=`
     <tr>
@@ -233,7 +259,10 @@ window.render=function(){
       <td>${prod.toFixed(2)}</td>
       <td>${zar.toFixed(2)}</td>
       <td>${r.kom||""}</td>
-      <td><button class="danger" onclick="obrisi('${r.id}')">❌</button></td>
+      <td>
+        <button onclick="editRow('${r.id}')">✏️</button>
+        <button class="danger" onclick="obrisi('${r.id}')">❌</button>
+      </td>
     </tr>`;
   });
 
@@ -242,10 +271,15 @@ window.render=function(){
 }
 
 const marzaInput=document.getElementById("marza");
-
 initMeseci();
 ucitajPodatke();
 </script>
-
+  
+<script>
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("sw.js");
+}
+</script>
+  
 </body>
 </html>
