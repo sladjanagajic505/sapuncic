@@ -1,6 +1,6 @@
 {
-  "name": "Pregled proizvodnje",
-  "short_name": "Sapuncic",
+  "name": "SapuncicS",
+  "short_name": "SapuncicS",
   "start_url": "/sapuncic/",
   "display": "standalone",
   "background_color": "#ffffff",
