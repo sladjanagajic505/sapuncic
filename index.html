@@ -155,10 +155,19 @@ let podaci=[];
 
 async function ucitajPodatke(){
   podaci=[];
-  const snap=await getDocs(collection(db,"proizvodnja"));
+  
+  const q = query(
+    collection(db,"proizvodnja"),
+    orderBy("datum","asc")   // 👈 od najmanjeg ka najvećem
+  );
+
+  const snap = await getDocs(q);
   snap.forEach(d=>podaci.push({id:d.id,...d.data()}));
+
   initGodine();
   render();
+  import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc, updateDoc, query, orderBy }
+from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 }
 
 window.dodaj = async function(){
