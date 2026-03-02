@@ -124,7 +124,7 @@ import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc, updateDoc, q
 from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyATddV2eWAhAN2gi6Y8uQTwqLf3pv4fyK8",
+  apiKey: "YOUR_API_KEY",
   authDomain: "pregled-proizvodnje.firebaseapp.com",
   projectId: "pregled-proizvodnje",
   storageBucket: "pregled-proizvodnje.appspot.com",
@@ -136,45 +136,71 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
 let podaci=[];
+let editId=null;
 
 async function ucitajPodatke(){
   podaci=[];
-  
-  const q = query(
-    collection(db,"proizvodnja"),
-    orderBy("datum","asc")   // SORTIRANJE OD NAJMANJEG KA NAJVEĆEM
-  );
-
+  const q=query(collection(db,"proizvodnja"),orderBy("datum","asc"));
   const snap=await getDocs(q);
   snap.forEach(d=>podaci.push({id:d.id,...d.data()}));
-
   initGodine();
   render();
 }
 
-window.dodaj = async function(){
+window.dodaj=async function(){
   if(!datum.value) return;
 
-  await addDoc(collection(db,"proizvodnja"),{
-    datum:datum.value,
-    vazna:vazna.value,
-    cena:+cenaVazne.value||0,
-    gram:+gramaza.value||0,
-    uk:+ukTezina.value||0,
-    ost:+ostalo.value||0,
-    kom:komentar.value,
-    prodajna:null,
-    rucna:false
-  });
+  if(editId){
+    await updateDoc(doc(db,"proizvodnja",editId),{
+      datum:datum.value,
+      vazna:vazna.value,
+      cena:+cenaVazne.value||0,
+      gram:+gramaza.value||0,
+      uk:+ukTezina.value||0,
+      ost:+ostalo.value||0,
+      kom:komentar.value
+    });
+    editId=null;
+    btnDodaj.textContent="Dodaj";
+  }else{
+    await addDoc(collection(db,"proizvodnja"),{
+      datum:datum.value,
+      vazna:vazna.value,
+      cena:+cenaVazne.value||0,
+      gram:+gramaza.value||0,
+      uk:+ukTezina.value||0,
+      ost:+ostalo.value||0,
+      kom:komentar.value,
+      prodajna:null,
+      rucna:false
+    });
+  }
 
   forma.querySelectorAll("input").forEach(i=>i.value="");
   datum.focus();
   ucitajPodatke();
-}
+};
 
-window.obrisi = async id=>{
+window.obrisi=async id=>{
   await deleteDoc(doc(db,"proizvodnja",id));
   ucitajPodatke();
+};
+
+window.editRow=function(id){
+  let r=podaci.find(x=>x.id===id);
+  if(!r) return;
+
+  datum.value=r.datum;
+  vazna.value=r.vazna;
+  cenaVazne.value=r.cena;
+  gramaza.value=r.gram;
+  ukTezina.value=r.uk;
+  ostalo.value=r.ost;
+  komentar.value=r.kom||"";
+
+  editId=id;
+  btnDodaj.textContent="Izmeni";
+  window.scrollTo({top:0,behavior:"smooth"});
 };
 
 function formatDatum(d){
@@ -231,14 +257,15 @@ window.render=function(){
       <td>${zar.toFixed(2)}</td>
       <td>${r.kom||""}</td>
       <td>
-        <button onclick="obrisi('${r.id}')">❌</button>
+        <button onclick="editRow('${r.id}')">✏️</button>
+        <button class="danger" onclick="obrisi('${r.id}')">❌</button>
       </td>
     </tr>`;
   });
 
   mesecZarada.textContent=mz.toFixed(2);
   mesecSapun.textContent=ms.toFixed(2);
-}
+};
 
 const marzaInput=document.getElementById("marza");
 initMeseci();
