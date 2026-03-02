@@ -3,12 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
 <title>Pregled proizvodnje</title>
 
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#6c63ff">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <style>
 :root{
@@ -18,14 +16,12 @@
   --danger:#ff7675;
   --text:#2d3436;
 }
-
 body{
   font-family:"Segoe UI",sans-serif;
   margin:10px;
   background:var(--bg);
   color:var(--text);
 }
-
 input,select,button{
   margin:4px;
   padding:8px 10px;
@@ -33,33 +29,26 @@ input,select,button{
   border:1px solid #dcdde1;
   font-size:14px;
 }
-
 button{
   background:var(--primary);
   color:#fff;
   border:none;
   cursor:pointer;
 }
-
 button.danger{background:var(--danger);}
-
-.filter, #forma{
+.filter,#forma{
   display:flex;
   flex-wrap:wrap;
   gap:6px;
 }
-
 .summary{
   margin:10px 0;
   font-weight:600;
 }
-
 .table-wrap{
   width:100%;
   overflow-x:auto;
-  -webkit-overflow-scrolling:touch;
 }
-
 table{
   width:100%;
   min-width:1200px;
@@ -67,29 +56,24 @@ table{
   margin-top:10px;
   background:var(--card);
 }
-
 th{
   background:var(--primary);
   color:#fff;
   padding:10px;
   white-space:nowrap;
 }
-
 td{
   padding:8px;
   border-bottom:1px solid #eee;
   white-space:nowrap;
 }
-
 td button{
   margin:0 2px;
   padding:4px 6px;
 }
-
 @media (max-width:768px){
-  .filter, #forma{flex-direction:column;}
+  .filter,#forma{flex-direction:column;}
   input,select,button{width:100%;font-size:16px;}
-  td button{min-width:38px;min-height:38px;}
 }
 </style>
 </head>
@@ -136,7 +120,7 @@ td button{
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc, updateDoc }
+import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc, updateDoc, query, orderBy }
 from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -155,8 +139,15 @@ let podaci=[];
 
 async function ucitajPodatke(){
   podaci=[];
-  const snap=await getDocs(collection(db,"proizvodnja"));
+  
+  const q = query(
+    collection(db,"proizvodnja"),
+    orderBy("datum","asc")   // SORTIRANJE OD NAJMANJEG KA NAJVEĆEM
+  );
+
+  const snap=await getDocs(q);
   snap.forEach(d=>podaci.push({id:d.id,...d.data()}));
+
   initGodine();
   render();
 }
@@ -186,18 +177,6 @@ window.obrisi = async id=>{
   ucitajPodatke();
 };
 
-/* ENTER NAVIGACIJA – FINAL FIX */
-const inputs=[datum,vazna,cenaVazne,gramaza,ukTezina,ostalo,komentar];
-inputs.forEach((inp,i)=>{
-  inp.addEventListener("keydown",e=>{
-    if(e.key==="Enter"){
-      e.preventDefault();
-      if(i<inputs.length-1) inputs[i+1].focus();
-      else document.getElementById("btnDodaj").click();
-    }
-  });
-});
-
 function formatDatum(d){
   if(!d) return "";
   let [y,m,da]=d.split("-");
@@ -216,14 +195,6 @@ function initGodine(){
   podaci.forEach(r=>r.datum&&set.add(r.datum.split("-")[0]));
   [...set].sort().forEach(y=>godina.innerHTML+=`<option>${y}</option>`);
 }
-
-window.editRow=id=>{
-  let r=podaci.find(x=>x.id===id);
-  let c=prompt("Unesi prodajnu cenu:",r.prodajna??"");
-  if(c===null||isNaN(+c)) return;
-  updateDoc(doc(db,"proizvodnja",id),{prodajna:+c,rucna:true})
-  .then(ucitajPodatke);
-};
 
 window.render=function(){
   tabela.innerHTML="";
@@ -260,8 +231,7 @@ window.render=function(){
       <td>${zar.toFixed(2)}</td>
       <td>${r.kom||""}</td>
       <td>
-        <button onclick="editRow('${r.id}')">✏️</button>
-        <button class="danger" onclick="obrisi('${r.id}')">❌</button>
+        <button onclick="obrisi('${r.id}')">❌</button>
       </td>
     </tr>`;
   });
@@ -274,12 +244,6 @@ const marzaInput=document.getElementById("marza");
 initMeseci();
 ucitajPodatke();
 </script>
-  
-<script>
-if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("sw.js");
-}
-</script>
-  
+
 </body>
 </html>
