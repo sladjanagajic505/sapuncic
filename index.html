@@ -108,10 +108,18 @@ td button{
 <table>
 <thead>
 <tr>
-  <th>Datum</th><th>Vazna</th><th>Cena</th><th>Gramaža</th>
-  <th>Uk.tež</th><th>Sapun</th><th>Ostalo</th>
-  <th>Ukupno</th><th>Prodajna</th><th>Zarada</th>
-  <th>Komentar</th><th></th>
+  <th>Datum</th>
+  <th>Vazna</th>
+  <th>Cena</th>
+  <th>Gramaža</th>
+  <th>Uk.tež</th>
+  <th>Sapun</th>
+  <th>Ostalo</th>
+  <th>Ukupno</th>
+  <th>Prodajna</th>
+  <th>Zarada</th>
+  <th>Komentar</th>
+  <th></th>
 </tr>
 </thead>
 <tbody id="tabela"></tbody>
@@ -203,6 +211,14 @@ window.editRow=function(id){
   window.scrollTo({top:0,behavior:"smooth"});
 };
 
+window.promeniCenu = async function(id, novaCena){
+  await updateDoc(doc(db,"proizvodnja",id),{
+    prodajna:+novaCena,
+    rucna:true
+  });
+  ucitajPodatke();
+};
+
 function formatDatum(d){
   if(!d) return "";
   let [y,m,da]=d.split("-");
@@ -241,7 +257,8 @@ window.render=function(){
     let prod=(r.rucna&&r.prodajna)?r.prodajna:ukup*(1+marza);
     let zar=prod-ukup;
 
-    mz+=zar; ms+=sap;
+    mz+=zar;
+    ms+=sap;
 
     tabela.innerHTML+=`
     <tr>
@@ -253,7 +270,10 @@ window.render=function(){
       <td>${sap.toFixed(2)}</td>
       <td>${r.ost}</td>
       <td>${ukup.toFixed(2)}</td>
-      <td>${prod.toFixed(2)}</td>
+      <td>
+        <input type="number" value="${prod.toFixed(2)}"
+        onchange="promeniCenu('${r.id}',this.value)" style="width:90px">
+      </td>
       <td>${zar.toFixed(2)}</td>
       <td>${r.kom||""}</td>
       <td>
@@ -268,6 +288,7 @@ window.render=function(){
 };
 
 const marzaInput=document.getElementById("marza");
+
 initMeseci();
 ucitajPodatke();
 </script>
